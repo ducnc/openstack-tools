@@ -49,23 +49,22 @@ function neutron_user_endpoint() {
 }
 
 function neutron_install() {
-        yum -y update && yum -y install openstack-neutron openstack-neutron-ml2 openstack-neutron-linuxbridge ebtables
-
+        yum -y update && yum -y install openstack-neutron openstack-neutron-ml2 openstack-neutron-openvswitch ebtables
 
 }
 
 function neutron_config() {		
 		ctl_neutron_conf=/etc/neutron/neutron.conf
-    ctl_ml2_conf=/etc/neutron/plugins/ml2/ml2_conf.ini
-    ctl_linuxbridge_agent=/etc/neutron/plugins/ml2/linuxbridge_agent.ini
-    ctl_dhcp_agent=/etc/neutron/dhcp_agent.ini
-    ctl_metadata_agent=/etc/neutron/metadata_agent.ini
+		ctl_ml2_conf=/etc/neutron/plugins/ml2/ml2_conf.ini
+		ctl_ovs_agent=/etc/neutron/plugins/ml2/openvswitch_agent.ini
+		ctl_dhcp_agent=/etc/neutron/dhcp_agent.ini
+		ctl_metadata_agent=/etc/neutron/metadata_agent.ini
 		ctl_l3_agent_conf=/etc/neutron/l3_agent.ini
         
         
         cp $ctl_neutron_conf $ctl_neutron_conf.orig
         cp $ctl_ml2_conf $ctl_ml2_conf.orig
-        cp $ctl_linuxbridge_agent $ctl_linuxbridge_agent.orig
+        cp $ctl_ovs_agent $ctl_ovs_agent.orig
         cp $ctl_dhcp_agent $ctl_dhcp_agent.orig
         cp $ctl_metadata_agent $ctl_metadata_agent.orig
         cp $ctl_l3_agent_conf $ctl_l3_agent_conf.orig
@@ -95,10 +94,10 @@ function neutron_config() {
         
         ops_edit $ctl_neutron_conf oslo_messaging_notifications driver messagingv2
         
-        ops_edit $ctl_neutron_conf linux_bridge physical_interface_mappings provider:ens256
-        ops_edit $ctl_neutron_conf vxlan enable_vxlan False
-        ops_edit $ctl_neutron_conf securitygroup enable_security_group True
-        ops_edit $ctl_neutron_conf securitygroup firewall_driver neutron.agent.linux.iptables_firewall.IptablesFirewallDriver
+        #ops_edit $ctl_neutron_conf linux_bridge physical_interface_mappings provider:ens256
+        #ops_edit $ctl_neutron_conf vxlan enable_vxlan False
+        #ops_edit $ctl_neutron_conf securitygroup enable_security_group True
+        #ops_edit $ctl_neutron_conf securitygroup firewall_driver neutron.agent.linux.iptables_firewall.IptablesFirewallDriver
 				      
         ops_edit $ctl_neutron_conf DEFAULT nova_metadata_ip $CTL1_IP_NIC1
         ops_edit $ctl_neutron_conf DEFAULT metadata_proxy_shared_secret $METADATA_SECRET
@@ -111,26 +110,45 @@ function neutron_config() {
         ops_edit $ctl_neutron_conf nova project_name service
         ops_edit $ctl_neutron_conf nova username nova
         ops_edit $ctl_neutron_conf nova password $NOVA_PASS
-        
-        ops_edit $ctl_neutron_conf oslo_concurrency lock_path /var/lib/neutron/tmp
-        
+                
         ops_edit $ctl_ml2_conf ml2 type_drivers flat,vlan,vxlan
         ops_edit $ctl_ml2_conf ml2 tenant_network_types vxlan
-        ops_edit $ctl_ml2_conf ml2 mechanism_drivers linuxbridge
+        ops_edit $ctl_ml2_conf ml2 mechanism_drivers openvswitch
         ops_edit $ctl_ml2_conf ml2 extension_drivers port_security          
-        ops_edit $ctl_ml2_conf ml2_type_flat flat_networks provider
+        ops_edit $ctl_ml2_conf ml2_type_flat flat_networks external
         ops_edit $ctl_ml2_conf ml2_type_vxlan vni_ranges 1:1000        
         ops_edit $ctl_ml2_conf securitygroup enable_ipset True
-				
-        ops_edit $ctl_l3_agent_conf DEFAULT interface_driver linuxbridge   
+		ops_edit $ctl_ml2_conf ml2_type_vlan network_vlan_ranges vlannet
+		
+		#L3 Agent
+		ops_edit $ctl_l3_agent_conf DEFAULT interface_driver \
+		neutron.agent.linux.interface.OVSInterfaceDriver
+		ops_edit $ctl_l3_agent_conf DEFAULT external_network_bridge
+		#ops_edit $ctl_l3_agent_conf DEFAULT interface_driver openvswitch   
 
-        ops_edit $ctl_linuxbridge_agent linux_bridge physical_interface_mappings provider:ens256
-        ops_edit $ctl_linuxbridge_agent vxlan enable_vxlan True
-        ops_edit $ctl_linuxbridge_agent vxlan local_ip $(ip addr show dev ens224 scope global | grep "inet " | sed -e 's#.*inet ##g' -e 's#/.*##g')
-        ops_edit $ctl_linuxbridge_agent securitygroup enable_security_group True
-        ops_edit $ctl_linuxbridge_agent securitygroup firewall_driver neutron.agent.linux.iptables_firewall.IptablesFirewallDriver
-       
-        ln -s /etc/neutron/plugins/ml2/ml2_conf.ini /etc/neutron/plugin.ini
+		#OVS agent
+		ops_edit $ctl_ovs_agent agent tunnel_types vxlan
+		ops_edit $ctl_ovs_agent agent l2_population False
+		ops_edit $ctl_ovs_agent ovs local_ip $(ip addr show dev ens33 scope global | grep "inet " | sed -e 's#.*inet ##g' -e 's#/.*##g')
+		ops_edit $ctl_ovs_agent ovs bridge_mappings = external:br-ens37
+		#ops_edit $ctl_ovs_agent ovs bridge_mappings vlannet:br-ens37
+		ops_edit $ctl_ovs_agent ovs integration_bridge br-int
+		ops_edit $ctl_ovs_agent ovs tunnel_bridge br-tun
+		ops_edit $ctl_ovs_agent ovs enable_tunneling True
+		ops_edit $ctl_ovs_agent securitygroup firewall_driver \
+		neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver
+		
+		#DHCP Agent
+		ops_edit $ctl_dhcp_agent DEFAULT interface_driver \
+		neutron.agent.linux.interface.OVSInterfaceDriver
+		ops_edit $ctl_dhcp_agent DEFAULT dhcp_driver neutron.agent.linux.dhcp.Dnsmasq
+		ops_edit $ctl_dhcp_agent DEFAULT enable_isolated_metadata True
+		
+		#Metadata
+		ops_edit $ctl_metadata_agent DEFAULT nova_metadata_ip $CTL1_IP_NIC1
+		ops_edit $ctl_metadata_agent DEFAULT metadata_proxy_shared_secret $METADATA_SECRET
+
+		ln -s /etc/neutron/plugins/ml2/ml2_conf.ini /etc/neutron/plugin.ini
 }
 
 function neutron_syncdb() {
@@ -141,17 +159,64 @@ function neutron_syncdb() {
 }
 
 function neutron_enable_restart() {
-      echocolor "Khoi dong dich vu NEUTRON"
-      sleep 3
-      systemctl enable neutron-server.service
-      systemctl start neutron-server.service
-			systemctl enable neutron-linuxbridge-agent.service
-			systemctl start neutron-linuxbridge-agent.service
-			#systemctl enable neutron-metadata-agent.service
-			#systemctl start neutron-metadata-agent.service
-			systemctl enable neutron-l3-agent.service
-			systemctl start neutron-l3-agent.service
+		echocolor "Khoi dong dich vu NEUTRON"
+		sleep 3
+		systemctl enable neutron-server.service
+		systemctl start neutron-server.service
+		systemctl enable neutron-openvswitch-agent.service
+		systemctl start neutron-openvswitch-agent.service
+		systemctl enable neutron-metadata-agent.service
+		systemctl start neutron-metadata-agent.service
+		systemctl enable neutron-l3-agent.service
+		systemctl start neutron-l3-agent.service
+		systemctl enable neutron-dhcp-agent.service
+		systemctl start neutron-dhcp-agent.service
 }
+
+function create_ovs_switch() {
+        echocolor "Tao OVS Switch"
+        sleep 3
+		ovs-vsctl add-br br-ens37
+		ovs-vsctl add-port br-ens37 ens37
+		ip addr add $CTL1_IP_NIC2/24 dev br-ens37
+		ip addr del $CTL1_IP_NIC2/24 dev ens37
+		cat << EOF > /etc/sysconfig/network-scripts/ifcfg-ens37
+NAME=ens37
+DEVICE=ens37
+TYPE=OVSPort
+DEVICETYPE=ovs
+OVS_BRIDGE=br-ens37
+ONBOOT=yes
+BOOTPROTO=none
+IPV4_FAILURE_FATAL="no"
+IPV6INIT="yes"
+IPV6_AUTOCONF="yes"
+IPV6_DEFROUTE="yes"
+IPV6_FAILURE_FATAL="no"
+IPV6_PEERDNS="yes"
+IPV6_PEERROUTES="yes"
+EOF
+		cat << EOF > /etc/sysconfig/network-scripts/ifcfg-br-ens37
+DEVICE=br-ens37
+DEVICETYPE=ovs
+TYPE=OVSBridge
+ONBOOT=yes
+BOOTPROTO=static
+IPADDR=$CTL1_IP_NIC2
+PREFIX=24
+NOZEROCONF=yes
+IPV4_FAILURE_FATAL=no
+IPV6INIT=yes
+IPV6_AUTOCONF=yes
+IPV6_DEFROUTE=yes
+IPV6_FAILURE_FATAL=no
+IPV6_PEERDNS=yes
+IPV6_PEERROUTES=yes
+EOF
+
+	systemctl restart network
+}
+
 
 ############################
 # Thuc thi cac functions
@@ -177,6 +242,7 @@ neutron_install
 echocolor "Cau hinh cho NEUTRON"
 sleep 3
 neutron_config
+create_ovs_switch
 
 #Dong bo DB cho NEUTRON"
 neutron_syncdb

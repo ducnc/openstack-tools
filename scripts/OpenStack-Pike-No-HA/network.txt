@@ -1,0 +1,18 @@
+openstack network create  --share --external \
+ --provider-physical-network external \
+ --provider-network-type flat external
+ 
+openstack subnet create subnet1_provider --network external \
+ --allocation-pool start=192.168.92.200,end=192.168.92.250 \
+ --dns-nameserver 8.8.8.8 --gateway 192.168.92.1 \
+ --subnet-range 192.168.92.0/24 
+
+openstack flavor create --id 0 --vcpus 1 --ram 64 --disk 1 m1.nano
+
+openstack security group rule create --proto icmp default
+openstack security group rule create --proto tcp --dst-port 22 default
+
+openstack server create Provider_VM01 --flavor m1.nano --image cirros \
+ 	--nic net-id=28a9f5ee-5578-42f7-8382-f1bf2b04d326 --security-group default
+
+openstack server list

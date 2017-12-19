@@ -68,6 +68,10 @@ function nova_install {
 				yum -y install openstack-nova-api openstack-nova-conductor \
 				openstack-nova-console openstack-nova-novncproxy \
 				openstack-nova-scheduler openstack-nova-placement-api
+				#For the compute service
+				yum install -y python-openstackclient openstack-selinux openstack-utils
+				yum install -y openstack-nova-compute
+
 }
 
 function nova_config {
@@ -136,6 +140,13 @@ function nova_config {
         
         ops_edit $ctl_nova_conf oslo_messaging_notifications driver messagingv2
         ops_edit $ctl_nova_conf cinder os_region_name RegionOne
+		
+		#FOR COMPUTE SERVICE
+		ops_edit $com_nova_conf vnc enabled True
+		ops_edit $com_nova_conf vnc novncproxy_base_url http://$CTL1_IP_NIC1:6080/vnc_auto.html
+
+		ops_edit $com_nova_conf libvirt virt_type  $(count=$(egrep -c '(vmx|svm)' /proc/cpuinfo); if [ $count -eq 0 ];then   echo "qemu"; else   echo "kvm"; fi)
+
 }
 
 
@@ -164,7 +175,11 @@ function nova_enable_restart {
 						systemctl start openstack-nova-api.service \
 						openstack-nova-consoleauth.service openstack-nova-scheduler.service \
 						openstack-nova-conductor.service openstack-nova-novncproxy.service
-        
+						
+						#For the compute service
+						systemctl enable libvirtd.service openstack-nova-compute.service
+						systemctl start libvirtd.service openstack-nova-compute.service
+
 }
 
 ############################

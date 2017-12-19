@@ -24,7 +24,7 @@ function ops_edit {
 
 
 # Ham de del mot dong trong file cau hinh
-my_ip=$(ip addr show dev ens160 scope global | grep "inet " | sed -e 's#.*inet ##g' -e 's#/.*##g')
+my_ip=$(ip addr show dev ens33 scope global | grep "inet " | sed -e 's#.*inet ##g' -e 's#/.*##g')
 function ops_del {
 	crudini --del $1 $2 $3
 }

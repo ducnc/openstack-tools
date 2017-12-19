@@ -33,6 +33,7 @@ function ops_del {
 
 function copykey {
         ssh-keygen -t rsa -f /root/.ssh/id_rsa -q -P ""
+		echocolor "Copy Public Key to other nodes"
         for IP_ADD in $CTL1_IP_NIC1 $COM1_IP_NIC1 $COM2_IP_NIC1
         do
                 ssh-copy-id -o StrictHostKeyChecking=no -i /root/.ssh/id_rsa.pub root@$IP_ADD
@@ -40,6 +41,7 @@ function copykey {
 }
 
 function setup_config {
+		echocolor "SCP source scripts to other nodes"
         for IP_ADD in $CTL1_IP_NIC1 $COM1_IP_NIC1 $COM2_IP_NIC1
         do
                 scp ./config.cfg root@$IP_ADD:/root/
@@ -97,9 +99,6 @@ function khai_bao_host {
         echo "$CTL1_IP_NIC1 controller1" >> /etc/hosts
         echo "$COM1_IP_NIC1 compute1" >> /etc/hosts
         echo "$COM2_IP_NIC1 compute2" >> /etc/hosts
-        echo "$CINDER1_IP_NIC1 cinder1" >> /etc/hosts
-        echo "$SWIFT1_IP_NIC1 swift1" >> /etc/hosts
-        echo "$SWIFT2_IP_NIC1 swift2" >> /etc/hosts
         scp /etc/hosts root@$COM1_IP_NIC1:/etc/
         scp /etc/hosts root@$COM2_IP_NIC1:/etc/
 }
@@ -144,7 +143,7 @@ EOF
 function install_memcached() {
         yum -y install memcached python-memcached
         cp /etc/sysconfig/memcached /etc/sysconfig/memcached.orig
-        IP_LOCAL=`ip -o -4 addr show dev ens160 | sed 's/.* inet \([^/]*\).*/\1/'`
+        IP_LOCAL=`ip -o -4 addr show dev ens33 | sed 's/.* inet \([^/]*\).*/\1/'`
         sed -i "s/-l 127.0.0.1,::1/-l 127.0.0.1,::1,$IP_LOCAL/g" /etc/sysconfig/memcached
 				systemctl enable memcached.service
 				systemctl start memcached.service
@@ -162,9 +161,9 @@ sleep 3
 copykey
 setup_config
 
-echocolor "Cai dat proxy tren cac node"
-sleep 3
-install_proxy
+#echocolor "Cai dat proxy tren cac node"
+#sleep 3
+#install_proxy
 
 echocolor "Cai dat repo tren cac node"
 sleep 3
