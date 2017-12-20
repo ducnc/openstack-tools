@@ -142,10 +142,10 @@ function nova_config {
         ops_edit $ctl_nova_conf cinder os_region_name RegionOne
 		
 		#FOR COMPUTE SERVICE
-		ops_edit $com_nova_conf vnc enabled True
-		ops_edit $com_nova_conf vnc novncproxy_base_url http://$CTL1_IP_NIC1:6080/vnc_auto.html
+		ops_edit $ctl_nova_conf vnc enabled True
+		ops_edit $ctl_nova_conf vnc novncproxy_base_url http://$CTL1_IP_NIC1:6080/vnc_auto.html
 
-		ops_edit $com_nova_conf libvirt virt_type  $(count=$(egrep -c '(vmx|svm)' /proc/cpuinfo); if [ $count -eq 0 ];then   echo "qemu"; else   echo "kvm"; fi)
+		ops_edit $ctl_nova_conf libvirt virt_type  $(count=$(egrep -c '(vmx|svm)' /proc/cpuinfo); if [ $count -eq 0 ];then   echo "qemu"; else   echo "kvm"; fi)
 
 }
 

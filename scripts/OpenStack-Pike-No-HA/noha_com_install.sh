@@ -99,21 +99,20 @@ function com_nova_restart {
 }
 
 function com_neutron_install {
-        yum install -y  openstack-neutron openstack-neutron-ml2 openstack-neutron-linuxbridge ebtables
-        yum install -y openstack-neutron-linuxbridge ebtables ipset
+        yum install -y  openstack-neutron openstack-neutron-ml2 openstack-neutron-openvswitch ebtables ipset
 }
 
 function com_neutron_config {
         com_neutron_conf=/etc/neutron/neutron.conf
         com_ml2_conf=/etc/neutron/plugins/ml2/ml2_conf.ini
-        com_linuxbridge_agent=/etc/neutron/plugins/ml2/linuxbridge_agent.ini
+        ctl_ovs_agent=/etc/neutron/plugins/ml2/openvswitch_agent.ini
         com_dhcp_agent=/etc/neutron/dhcp_agent.ini
         com_metadata_agent=/etc/neutron/metadata_agent.ini
         
         
         cp $com_neutron_conf $com_neutron_conf.orig
         cp $com_ml2_conf $com_ml2_conf.orig
-        cp $com_linuxbridge_agent $com_linuxbridge_agent.orig
+        cp $ctl_ovs_agent $ctl_ovs_agent.orig
         cp $com_dhcp_agent $com_dhcp_agent.orig
         cp $com_metadata_agent $com_metadata_agent.orig
         
@@ -142,31 +141,89 @@ function com_neutron_config {
         
         ops_edit $com_neutron_conf oslo_messaging_notifications driver messagingv2
         
-        ops_edit $com_linuxbridge_agent linux_bridge physical_interface_mappings provider:ens256
-        ops_edit $com_linuxbridge_agent vxlan enable_vxlan True
-        ops_edit $com_linuxbridge_agent vxlan local_ip $(ip addr show dev ens224 scope global | grep "inet " | sed -e 's#.*inet ##g' -e 's#/.*##g')
-        ops_edit $com_linuxbridge_agent securitygroup enable_security_group True
-        ops_edit $com_linuxbridge_agent securitygroup firewall_driver neutron.agent.linux.iptables_firewall.IptablesFirewallDriver
+		#OVS agent
+		ops_edit $ctl_ovs_agent agent tunnel_types vxlan
+		ops_edit $ctl_ovs_agent agent l2_population False
+		ops_edit $ctl_ovs_agent ovs local_ip $(ip addr show dev ens33 scope global | grep "inet " | sed -e 's#.*inet ##g' -e 's#/.*##g')
+		ops_edit $ctl_ovs_agent ovs bridge_mappings external:br-ens37
+		#ops_edit $ctl_ovs_agent ovs bridge_mappings vlannet:br-ens37
+		ops_edit $ctl_ovs_agent ovs integration_bridge br-int
+		ops_edit $ctl_ovs_agent ovs tunnel_bridge br-tun
+		ops_edit $ctl_ovs_agent ovs enable_tunneling True
+		ops_edit $ctl_ovs_agent securitygroup firewall_driver \
+		neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver
+		
+        #ops_edit $com_linuxbridge_agent linux_bridge physical_interface_mappings provider:ens256
+        #ops_edit $com_linuxbridge_agent vxlan enable_vxlan True
+        #ops_edit $com_linuxbridge_agent vxlan local_ip $(ip addr show dev ens224 scope global | grep "inet " | sed -e 's#.*inet ##g' -e 's#/.*##g')
+        #ops_edit $com_linuxbridge_agent securitygroup enable_security_group True
+        #ops_edit $com_linuxbridge_agent securitygroup firewall_driver neutron.agent.linux.iptables_firewall.IptablesFirewallDriver
         
-        ops_edit $com_metadata_agent DEFAULT nova_metadata_ip $CTL1_IP_NIC1
-        ops_edit $com_metadata_agent DEFAULT metadata_proxy_shared_secret $METADATA_SECRET
+        #ops_edit $com_metadata_agent DEFAULT nova_metadata_ip $CTL1_IP_NIC1
+        #ops_edit $com_metadata_agent DEFAULT metadata_proxy_shared_secret $METADATA_SECRET
         
-        ops_edit $com_dhcp_agent DEFAULT interface_driver neutron.agent.linux.interface.BridgeInterfaceDriver
-        ops_edit $com_dhcp_agent DEFAULT enable_isolated_metadata True
-        ops_edit $com_dhcp_agent DEFAULT dhcp_driver neutron.agent.linux.dhcp.Dnsmasq
-        ops_edit $com_dhcp_agent DEFAULT force_metadata True
+        #ops_edit $com_dhcp_agent DEFAULT interface_driver neutron.agent.linux.interface.BridgeInterfaceDriver
+        #ops_edit $com_dhcp_agent DEFAULT enable_isolated_metadata True
+        #ops_edit $com_dhcp_agent DEFAULT dhcp_driver neutron.agent.linux.dhcp.Dnsmasq
+        #ops_edit $com_dhcp_agent DEFAULT force_metadata True
 }
 
 function com_neutron_restart {
-        systemctl enable neutron-linuxbridge-agent.service
-        systemctl enable neutron-metadata-agent.service
-        systemctl enable neutron-dhcp-agent.service
+        systemctl enable neutron-openvswitch-agent.service
+        #systemctl enable neutron-metadata-agent.service
+        #systemctl enable neutron-dhcp-agent.service
         
-        systemctl start neutron-linuxbridge-agent.service
-        systemctl start neutron-metadata-agent.service
-        systemctl start neutron-dhcp-agent.service
+        systemctl start neutron-openvswitch-agent.service
+        #systemctl start neutron-metadata-agent.service
+        #systemctl start neutron-dhcp-agent.service
 
 }
+
+function create_ovs_switch() {
+        echocolor "Tao OVS Switch"
+        sleep 3
+		IP_NIC2=$(ip addr show dev ens37 scope global | grep "inet " | sed -e 's#.*inet ##g' -e 's#/.*##g')
+		ovs-vsctl add-br br-ens37
+		ovs-vsctl add-port br-ens37 ens37
+		ip addr add $IP_NIC2/24 dev br-ens37
+		ip addr del $IP_NIC2/24 dev ens37
+		cat << EOF > /etc/sysconfig/network-scripts/ifcfg-ens37
+NAME=ens37
+DEVICE=ens37
+TYPE=OVSPort
+DEVICETYPE=ovs
+OVS_BRIDGE=br-ens37
+ONBOOT=yes
+BOOTPROTO=none
+IPV4_FAILURE_FATAL="no"
+IPV6INIT="yes"
+IPV6_AUTOCONF="yes"
+IPV6_DEFROUTE="yes"
+IPV6_FAILURE_FATAL="no"
+IPV6_PEERDNS="yes"
+IPV6_PEERROUTES="yes"
+EOF
+		cat << EOF > /etc/sysconfig/network-scripts/ifcfg-br-ens37
+DEVICE=br-ens37
+DEVICETYPE=ovs
+TYPE=OVSBridge
+ONBOOT=yes
+BOOTPROTO=static
+IPADDR=$IP_NIC2
+PREFIX=24
+NOZEROCONF=yes
+IPV4_FAILURE_FATAL=no
+IPV6INIT=yes
+IPV6_AUTOCONF=yes
+IPV6_DEFROUTE=yes
+IPV6_FAILURE_FATAL=no
+IPV6_PEERDNS=yes
+IPV6_PEERROUTES=yes
+EOF
+
+	systemctl restart network
+}
+
 
 ##############################################################################
 # Thuc thi cac functions
@@ -196,4 +253,6 @@ com_neutron_config
 
 echocolor "Restart dich vu NEUTRON"
 sleep 3
+com_neutron_restart
+create_ovs_switch
 com_neutron_restart

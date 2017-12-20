@@ -130,7 +130,7 @@ function neutron_config() {
 		ops_edit $ctl_ovs_agent agent tunnel_types vxlan
 		ops_edit $ctl_ovs_agent agent l2_population False
 		ops_edit $ctl_ovs_agent ovs local_ip $(ip addr show dev ens33 scope global | grep "inet " | sed -e 's#.*inet ##g' -e 's#/.*##g')
-		ops_edit $ctl_ovs_agent ovs bridge_mappings = external:br-ens37
+		ops_edit $ctl_ovs_agent ovs bridge_mappings external:br-ens37
 		#ops_edit $ctl_ovs_agent ovs bridge_mappings vlannet:br-ens37
 		ops_edit $ctl_ovs_agent ovs integration_bridge br-int
 		ops_edit $ctl_ovs_agent ovs tunnel_bridge br-tun
