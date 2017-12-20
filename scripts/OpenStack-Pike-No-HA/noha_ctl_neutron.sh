@@ -76,7 +76,7 @@ function neutron_config() {
         ops_edit $ctl_neutron_conf DEFAULT notify_nova_on_port_status_changes True
         ops_edit $ctl_neutron_conf DEFAULT notify_nova_on_port_data_changes True  
         ops_edit $ctl_neutron_conf DEFAULT allow_overlapping_ips True 
-        ops_edit $ctl_neutron_conf DEFAULT dhcp_agents_per_network 2
+        #ops_edit $ctl_neutron_conf DEFAULT dhcp_agents_per_network 2
                 
         ops_edit $ctl_neutron_conf database connection  mysql+pymysql://neutron:$PASS_DATABASE_NEUTRON@$CTL1_IP_NIC1/neutron
         
@@ -242,13 +242,14 @@ neutron_install
 echocolor "Cau hinh cho NEUTRON"
 sleep 3
 neutron_config
-create_ovs_switch
 
 #Dong bo DB cho NEUTRON"
 neutron_syncdb
 
 echocolor "Restart dich vu NEUTRON"
 sleep 3
+neutron_enable_restart
+create_ovs_switch
 neutron_enable_restart
 
 echocolor "Da cai dat xong NEUTRON"

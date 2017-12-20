@@ -36,36 +36,24 @@
 	bash setup_ip.sh compute2 192.168.20.35 10.10.0.35 172.16.20.35 192.168.40.35
 	```
 
-- Thực hiện trên máy Cinder
-
-	```sh
-	curl -O https://raw.githubusercontent.com/ducnc/openstack-tools/master/scripts/OpenStack-Pike-No-HA/setup_ip.sh
-
-	bash setup_ip.sh cinder1 192.168.20.36 10.10.0.36 172.16.20.36 192.168.40.36
-	```
-
 	
 ## Thực hiện script cài đặt OpenStack
 ### 2. Thực hiện cài đặt trên Controller
 #### 2.1. Tải script 
-- Đứng trên node CTL1 và thực hiện các bước dưới.
-- Chuyển sang quyền root
-	```sh
-	su -
-	```
-	
-- Cài đặt git và script cài đặt.
-	```sh
-	yum -y install git
-	git clone https://github.com/ducnc/openstack-tools.git
-
-	mv openstack-tools/scripts/OpenStack-Pike-No-HA /root/
-
-	cd OpenStack-Pike-No-HA
-	chmod +x *.sh
-	```
 
 - Nếu muốn sửa các IP thì sử dụng VI hoặc VIM để sửa, cần lưu ý tên NICs và địa chỉ IP cần phải tương ứng (trong này này tên NICs là ens33, ens37)
+
+```sh
+cd OpenStack-Pike-No-HA
+sed -i "s/ens37/ens34/g" *.*
+sed -i "s/192.168.20/192.168.222/g" *.*
+vi config.cfg 
+
+#Check
+grep -Rin ens37 .
+grep -Rin "192.168.20" .
+
+```
 
 - Trong toàn bộ quá trình chạy script, chỉ cần thực hiện trên node CTL1, script sẽ tự động cài đặt các node còn lại. Do vậy cần phải ping được từ node CTL1 tới COM1 và COM2 để đảm bảo CTL1 có thể tạo ssh keygen cho COM1 và COM2.
 
