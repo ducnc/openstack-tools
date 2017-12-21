@@ -1,3 +1,10 @@
+#Controller1
+yum install git 
+git clone https://github.com/ducnc/openstack-tools.git
+mv openstack-tools/scripts/OpenStack-Pike-No-HA/ .
+cd OpenStack-Pike-No-HA/
+
+#Network
 eth1: management network, internet access
 eth0: provider flat network
 172.16.68: management subnet
@@ -13,8 +20,6 @@ vi setup_ip.sh
 INTERFACE1=eth1
 INTERFACE2=eth0
 IP_GATEWAY=172.16.68.1
-#add them
-sudo systemctl restart NetworkManager
 
 
 vi config.cfg
@@ -24,10 +29,12 @@ vi config.cfg
 bash setup_ip.sh controller1 172.16.68.130 10.10.10.130
 
 #Tren controller1
+cd OpenStack-Pike-No-HA/
 sudo yum -y install epel-release
 sudo yum -y install byobu
 byobu
 bash noha_ctl_prepare.sh
+cd OpenStack-Pike-No-HA/
 bash noha_ctl_install_db_rabbitmq.sh
 bash noha_ctl_keystone.sh
 bash noha_ctl_glance.sh 
@@ -43,7 +50,8 @@ bash noha_ctl_horizon.sh
 #Fix horizon 503 ERROR
 #End of script output before headers: django.wsgi, referer: http://172.16.68.130/
 vi /etc/httpd/conf.d/openstack-dashboard.conf
-WSGIApplicationGroup %{GLOBAL}		#add this line
+#add this line
+WSGIApplicationGroup %{GLOBAL}
 
 
 

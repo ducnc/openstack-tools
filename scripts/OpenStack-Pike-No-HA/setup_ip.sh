@@ -23,6 +23,7 @@ echo "Cau hinh IP va hostname"
 sleep 3
 
 hostnamectl set-hostname $1
+sudo systemctl restart NetworkManager
 
 nmcli con modify $INTERFACE1 ipv4.addresses $IP1/$IP_NETMASK
 nmcli con modify $INTERFACE1 ipv4.gateway $IP_GATEWAY
